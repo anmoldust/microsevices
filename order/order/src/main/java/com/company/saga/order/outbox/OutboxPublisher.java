@@ -26,7 +26,6 @@ public class OutboxPublisher {
     }
 
     @Scheduled(fixedDelay = 50000, initialDelay = 50000)
-    @Transactional
     public void publish() {
         for (OutboxEvent event : repository.findByPublishedFalseOrderByCreatedAtAsc()) {
             try {
