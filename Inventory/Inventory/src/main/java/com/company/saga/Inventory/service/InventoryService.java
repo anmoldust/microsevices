@@ -22,7 +22,7 @@ public class InventoryService {
     }
 
     public void reserve(UUID orderId) {
-        boolean success = false; // simulate failure
+        boolean success = random.nextBoolean(); // simulate failure
 
         InventoryReservation reservation =
                 new InventoryReservation(UUID.randomUUID(), orderId);

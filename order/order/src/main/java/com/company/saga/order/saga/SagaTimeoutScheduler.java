@@ -1,12 +1,13 @@
 package com.company.saga.order.saga;
 
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
 import com.company.saga.order.component.SagaStep;
 import com.company.saga.order.config.SagaTimeoutConfig;
-import com.company.saga.order.messaging.producer.OrderCommandProducer;
+import com.company.saga.order.outbox.OutboxEvent;
 import com.company.saga.order.repository.OrderSagaRepository;
+import com.company.saga.order.repository.OutboxRepository;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -15,15 +16,16 @@ import java.util.List;
 public class SagaTimeoutScheduler {
 
     private final OrderSagaRepository sagaRepository;
-    private final OrderCommandProducer producer;
+    private final OutboxRepository outboxRepository;
 
     public SagaTimeoutScheduler(OrderSagaRepository sagaRepository,
-                                OrderCommandProducer producer) {
+                                OutboxRepository outboxRepository) {
         this.sagaRepository = sagaRepository;
-        this.producer = producer;
+        this.outboxRepository = outboxRepository;
     }
 
-//    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedDelay = 5000)
+    @Transactional
     public void checkForTimeouts() {
         Instant timeoutThreshold =
                 Instant.now().minusSeconds(SagaTimeoutConfig.STEP_TIMEOUT_SECONDS);
@@ -60,14 +62,20 @@ public class SagaTimeoutScheduler {
 
     private void retryStep(OrderSagaState saga) {
         switch (saga.getCurrentStep()) {
-            case PAYMENT -> producer.sendPaymentCommand(saga.getOrderId());
-            case INVENTORY -> producer.sendInventoryCommand(saga.getOrderId());
+            case PAYMENT -> outboxRepository.save(
+                    new OutboxEvent("payment-commands", saga.getOrderId().toString())
+            );
+            case INVENTORY -> outboxRepository.save(
+                    new OutboxEvent("inventory-commands", saga.getOrderId().toString())
+            );
         }
     }
 
     private void compensate(OrderSagaState saga) {
         if (saga.getCurrentStep() == SagaStep.INVENTORY) {
-            producer.sendRefundCommand(saga.getOrderId());
+            outboxRepository.save(
+                    new OutboxEvent("payment-refund-commands", saga.getOrderId().toString())
+            );
         }
     }
 }

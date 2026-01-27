@@ -1,12 +1,19 @@
 package com.company.saga.payment.messaging.producer;
 
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Component
 public class PaymentEventProducer {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentEventProducer.class);
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
@@ -15,10 +22,20 @@ public class PaymentEventProducer {
     }
 
     public void sendPaymentSuccess(UUID orderId) {
-        kafkaTemplate.send("payment-events", orderId + ":SUCCESS");
+        sendWithEventId("payment-events", orderId + ":SUCCESS");
     }
 
     public void sendPaymentFailure(UUID orderId) {
-        kafkaTemplate.send("payment-events", orderId + ":FAILED");
+        log.info("Payment failed for orderId: {}", orderId);
+        sendWithEventId("payment-events", orderId + ":FAILED");
+    }
+
+    private void sendWithEventId(String topic, String payload) {
+        String eventId = UUID.randomUUID().toString();
+        RecordHeaders headers = new RecordHeaders();
+        headers.add("eventId", eventId.getBytes(StandardCharsets.UTF_8));
+
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, null, null, payload, headers);
+        kafkaTemplate.send(record);
     }
 }

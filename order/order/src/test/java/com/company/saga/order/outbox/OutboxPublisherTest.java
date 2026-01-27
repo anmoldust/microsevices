@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,7 +40,7 @@ class OutboxPublisherTest {
     @Test
     void shouldPublishEvents() {
         // Given
-        when(repository.findByPublishedFalseOrderByCreatedAtAsc()).thenReturn(List.of(outboxEvent));
+        when(repository.findByPublishedFalseOrderByCreatedAtAsc(any(Pageable.class))).thenReturn(List.of(outboxEvent));
         when(outboxEvent.getTopic()).thenReturn("test-topic");
         when(outboxEvent.getPayload()).thenReturn("test-payload");
 
@@ -58,7 +60,7 @@ class OutboxPublisherTest {
 
     @Test
     void shouldHandleEmptyOutbox() {
-        when(repository.findByPublishedFalseOrderByCreatedAtAsc()).thenReturn(Collections.emptyList());
+        when(repository.findByPublishedFalseOrderByCreatedAtAsc(any(Pageable.class))).thenReturn(Collections.emptyList());
 
         outboxPublisher.publish();
 

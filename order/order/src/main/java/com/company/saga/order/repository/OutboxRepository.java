@@ -1,5 +1,6 @@
 package com.company.saga.order.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.company.saga.order.outbox.OutboxEvent;
@@ -11,5 +12,6 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, UUID> {
 
     List<OutboxEvent> findByPublishedFalse();
     List<OutboxEvent> findByPublishedFalseOrderByCreatedAtAsc();
+    List<OutboxEvent> findByPublishedFalseOrderByCreatedAtAsc(Pageable pageable);
     
 }

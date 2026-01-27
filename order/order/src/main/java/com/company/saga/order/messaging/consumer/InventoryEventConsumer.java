@@ -8,19 +8,35 @@ import com.company.saga.order.component.OrderSaga;
 import com.company.saga.order.inbox.InboxEvent;
 import com.company.saga.order.repository.InboxRepository;
 
+import jakarta.transaction.Transactional;
+
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Component
 public class InventoryEventConsumer {
 
     private final OrderSaga saga;
+    private final InboxRepository inboxRepository;
 
-    public InventoryEventConsumer(OrderSaga saga) {
+    public InventoryEventConsumer(OrderSaga saga, InboxRepository inboxRepository) {
         this.saga = saga;
+        this.inboxRepository = inboxRepository;
     }
 
     @KafkaListener(topics = "inventory-events")
-    public void consume(String message) {
+    @Transactional
+    public void consume(String message, @Header(name = "eventId", required = false) byte[] eventIdBytes) {
+        if (eventIdBytes == null) {
+            return;
+        }
+
+        UUID eventId = UUID.fromString(new String(eventIdBytes, StandardCharsets.UTF_8));
+        if (inboxRepository.existsById(eventId)) {
+            return; // duplicate -> ignore
+        }
+        inboxRepository.save(new InboxEvent(eventId));
+
         String[] parts = message.split(":");
         UUID orderId = UUID.fromString(parts[0]);
         String status = parts[1];
@@ -32,40 +48,3 @@ public class InventoryEventConsumer {
         }
     }
 }
-
-
-//@Component
-//public class InventoryEventConsumer {
-//
-//    private final OrderSaga saga;
-//    private final InboxRepository inboxRepository;
-//
-//    public InventoryEventConsumer(OrderSaga saga,InboxRepository inboxRepository) {
-//        this.saga = saga;
-//        this.inboxRepository = inboxRepository;
-//    }
-//
-//
-//
-//    @KafkaListener(topics = "inventory-events")
-//    public void consume(String message, @Header("eventId") String eventId) {
-//
-//        UUID uuid = UUID.fromString(eventId);
-//
-//        if (inboxRepository.existsById(uuid)) {
-//            return; // duplicate → ignore
-//        }
-//
-//        inboxRepository.save(new InboxEvent(uuid));
-//
-//        String[] parts = message.split(":");
-//        UUID orderId = UUID.fromString(parts[0]);
-//        String status = parts[1];
-//
-//        if ("SUCCESS".equals(status)) {
-//            saga.onPaymentSuccess(orderId);
-//        } else {
-//            saga.onPaymentFailure(orderId);
-//        }
-//    }
-//}
