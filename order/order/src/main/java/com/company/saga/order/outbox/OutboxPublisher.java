@@ -2,18 +2,20 @@ package com.company.saga.order.outbox;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.company.saga.order.messaging.producer.OrderCommandProducer;
 import com.company.saga.order.repository.OutboxRepository;
+
+import jakarta.transaction.Transactional;
 
 @Component
 public class OutboxPublisher {
     private static final Logger log =
             LoggerFactory.getLogger(OutboxPublisher.class);
-    private static final int BATCH_SIZE = 50;
     private final OutboxRepository repository;
     private final KafkaTemplate<String, String> kafkaTemplate;
 
@@ -23,9 +25,9 @@ public class OutboxPublisher {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    @Scheduled(fixedDelay = 5000, initialDelay = 5000)
+    @Scheduled(fixedDelay = 50000, initialDelay = 50000)
     public void publish() {
-        for (OutboxEvent event : repository.findByPublishedFalseOrderByCreatedAtAsc(PageRequest.of(0, BATCH_SIZE))) {
+        for (OutboxEvent event : repository.findByPublishedFalseOrderByCreatedAtAsc()) {
             try {
                 var result = kafkaTemplate.send(event.getTopic(), event.getPayload()).get();
                 
