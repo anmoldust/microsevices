@@ -1,6 +1,10 @@
 package com.company.saga.order.messaging.consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -18,16 +22,28 @@ public class PaymentEventConsumer {
 
     private final OrderSaga saga;
     private final InboxRepository inboxRepository;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final Logger log = LoggerFactory.getLogger(PaymentEventConsumer.class);
 
-    public PaymentEventConsumer(OrderSaga saga, InboxRepository inboxRepository) {
+    public PaymentEventConsumer(
+            OrderSaga saga,
+            InboxRepository inboxRepository,
+            KafkaTemplate<String, String> kafkaTemplate
+    ) {
         this.saga = saga;
         this.inboxRepository = inboxRepository;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @KafkaListener(topics = "payment-events")
     @Transactional
-    public void consume(String message, @Header(name = "eventId", required = false) byte[] eventIdBytes) {
+    public void consume(
+            String message,
+            @Header(name = "eventId", required = false) byte[] eventIdBytes,
+            @Header(name = KafkaHeaders.RECEIVED_TOPIC, required = false) String topic
+    ) {
         if (eventIdBytes == null) {
+            sendToDlq(topic, "missing_eventId", message);
             return;
         }
 
@@ -46,5 +62,23 @@ public class PaymentEventConsumer {
         } else {
             saga.onPaymentFailure(orderId);
         }
+    }
+
+    private void sendToDlq(String topic, String reason, String payload) {
+        String safeTopic = topic == null ? "unknown-topic" : topic;
+        String dlqPayload = "{\"topic\":\"" + safeTopic
+                + "\",\"reason\":\"" + reason
+                + "\",\"payload\":\"" + escapeJson(payload) + "\"}";
+        kafkaTemplate.send("order-dead-letter", dlqPayload);
+        log.warn("Sent to DLQ: {}", dlqPayload);
+    }
+
+    private String escapeJson(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }

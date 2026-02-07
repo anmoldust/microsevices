@@ -1,7 +1,5 @@
 package com.company.saga.Inventory.messaging.producer;
 
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -27,10 +25,8 @@ public class InventoryEventProducer {
 
     private void sendWithEventId(String topic, String payload) {
         String eventId = UUID.randomUUID().toString();
-        RecordHeaders headers = new RecordHeaders();
-        headers.add("eventId", eventId.getBytes(StandardCharsets.UTF_8));
-
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic, null, null, payload, headers);
+        var record = new org.apache.kafka.clients.producer.ProducerRecord<String, String>(topic, payload);
+        record.headers().add("eventId", eventId.getBytes(StandardCharsets.UTF_8));
         kafkaTemplate.send(record);
     }
 }
